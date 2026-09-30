@@ -6,15 +6,27 @@ from .contracts import (
     MidgardResponse,
     SpeakerContext,
 )
-from .ports import CoreRequestHandler
+from .observability import (
+    NullMidgardObserver,
+    RoutingEvent,
+    RoutingEventType,
+)
+from .ports import AsgardTarget, CoreRequestHandler, MidgardObserver
+from .router import MidgardRouter
 
 __all__ = [
+    "AsgardTarget",
     "CoreRequestHandler",
     "MidgardChannel",
     "MidgardError",
     "MidgardErrorCode",
+    "MidgardObserver",
     "MidgardRequest",
     "MidgardResponse",
+    "MidgardRouter",
+    "NullMidgardObserver",
+    "RoutingEvent",
+    "RoutingEventType",
     "SpeakerContext",
 ]
 

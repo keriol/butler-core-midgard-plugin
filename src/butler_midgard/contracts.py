@@ -6,7 +6,13 @@ from enum import Enum
 
 class MidgardErrorCode(str, Enum):
     INVALID_REQUEST = "invalid_request"
+    TARGET_REQUIRED = "target_required"
+    UNKNOWN_TARGET = "unknown_target"
+    TARGET_UNAVAILABLE = "target_unavailable"
+    AMBIGUOUS_TARGET = "ambiguous_target"
     CORRELATION_MISMATCH = "correlation_mismatch"
+    SOURCE_IDENTITY_MISMATCH = "source_identity_mismatch"
+    TARGET_FAILURE = "target_failure"
     CORE_FAILURE = "core_failure"
 
 
@@ -30,6 +36,7 @@ class MidgardRequest:
 class MidgardResponse:
     request_id: str
     response: str
+    source_butler_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

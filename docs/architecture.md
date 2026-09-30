@@ -2,63 +2,100 @@
 
 Midgard is the reusable cross-Butler communication channel between Bifröst and Butler Core.
 
+## Canonical routing model
+
+Every concrete Butler owns its own Asgard entity. Asgard is the authoritative source of that Butler's name.
+
+Midgard observes the Asgard targets available to it and chooses the requested Butler universe.
+
 ```text
-external client
-      |
-    Bifröst
-      |
-    Midgard
-      |
-  Butler Core
-      |
- concrete Butler runtime
-      |
- Butler-owned ingress entity
- (for Alfred: Asgard)
+                       Asgard("Butler-A") -> Butler A
+                      /
+Bifröst -> Midgard --+-- Asgard("Butler-B") -> Butler B
+                      \
+                       Asgard("Butler-C") -> Butler C
 ```
 
-Responses travel through the same communication path in reverse.
+Butler Core remains provider-neutral. It owns neither Butler identity nor cross-Butler target selection.
 
-## Ownership
+## Identity ownership
+
+Request-side routing metadata:
+
+```text
+target_butler_name
+```
+
+is carried into Midgard.
+
+Response-side identity:
+
+```text
+source_butler_name
+```
+
+must be supplied by the selected Butler's Asgard.
+
+Midgard verifies that the response identity matches the Asgard it selected. It never fabricates or silently substitutes a Butler identity.
+
+## Midgard ownership
 
 Midgard owns:
 
 - provider-neutral request/response channel contracts;
+- visibility of Butler-owned Asgard targets through a neutral port;
+- deterministic cross-Butler selection;
 - request correlation preservation;
 - safe routing/session metadata transport;
-- a Core-facing handler seam;
-- structured channel failures.
+- structured routing failures;
+- neutral routing observability events.
 
 Midgard does not own:
 
+- a Butler's name;
+- Butler-side Asgard implementation;
 - client UI, STT or TTS;
 - Bifröst transport/session implementation;
-- Butler-side entities such as Asgard;
 - concrete runtime lifecycle;
 - domain intent parsing or business logic;
 - provider-specific behavior;
 - authentication, permission or confirmation policy.
 
-## Asgard ownership
+## Routing failures
 
-Asgard is **not** a Butler Core plugin and is not part of Midgard.
+There is no implicit default Butler.
 
-Asgard is a Butler-side plugin/entity. In the current private proving runtime, it is an entity of Alfred.
+Stable failures include:
 
-Midgard/Core may communicate toward a concrete Butler runtime through a Butler-owned ingress boundary, but ownership of that boundary remains with the Butler.
+- missing target;
+- unknown target;
+- unavailable target;
+- duplicate/ambiguous identity;
+- downstream ingress failure;
+- correlation mismatch;
+- source-identity mismatch.
 
-## Target Butler metadata
+## Georges observability
 
-A request may carry `target_butler_name`.
+Midgard does not import Alfred or Georges.
 
-MID-001 only transports that metadata. It deliberately does **not** define which component resolves a requested Butler name to a concrete runtime.
+Instead, Midgard exposes a neutral observer port and emits structured routing events:
 
-That routing responsibility must be specified separately. In particular, it must not be assigned to Alfred's Asgard entity merely because Asgard is the Butler-side ingress boundary.
+```text
+midgard.route.received
+midgard.route.selected
+midgard.route.completed
+midgard.route.failed
+```
 
-## Core-facing seam
+A concrete Butler host may adapt this port to its observability system. In the current private Alfred proving runtime, the adapter will project these facts into Georges.
 
-MID-001 uses an injected `CoreRequestHandler` protocol.
+This preserves the rule:
 
-The protocol is intentionally small and runtime-neutral. It proves the communication contract without forcing Midgard to depend on Alfred, Wilfred, an HTTP transport, Asgard, or a runtime loader.
+```text
+Midgard -> neutral routing event -> Alfred adapter -> Georges
+```
 
-A later integration slice can connect this seam to Butler Core using evidence from a real consumer rather than inventing a broader Core abstraction prematurely.
+Georges records the fact. Osvaldo remains responsible for deciding whether an eligible event becomes user-facing communication, and Hermes/Bifröst remain delivery mechanisms after policy approval.
+
+Observer failure must not change the routing result.
