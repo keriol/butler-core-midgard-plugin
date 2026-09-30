@@ -13,14 +13,15 @@ external client
       |
   Butler Core
       |
-[runtime required]
+ concrete Butler runtime
       |
-    Asgard
-      |
-active Butler runtime
+ Butler-owned ingress entity
+ (for Alfred: Asgard)
 ```
 
-Responses return through the same path in reverse.
+Responses return through the same communication path in reverse.
+
+**Asgard is not a Butler Core plugin.** It is a Butler-side plugin/entity. In the current private proving runtime, Asgard is an Alfred entity.
 
 The project is currently in private incubation and is being developed public-ready from the first commit.
 
@@ -28,7 +29,7 @@ The project is currently in private incubation and is being developed public-rea
 
 Midgard owns provider-neutral communication-channel contracts, correlation preservation, safe routing/session metadata transport, and structured channel errors.
 
-Midgard does not own concrete Butler runtime resolution, domain behavior, provider logic, UI, STT/TTS, authentication policy, or runtime creation.
+Midgard does not own concrete Butler runtime behavior, Butler-side entities such as Asgard, domain behavior, provider logic, UI, STT/TTS, authentication policy, or runtime creation.
 
 ## Status
 
