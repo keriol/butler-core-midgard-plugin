@@ -2,6 +2,18 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from butler_core import (
+    NullTracer,
+    TraceContext,
+    TraceEvent,
+    TraceLevel,
+    TraceSeverity,
+    TraceStatus,
+    Tracer,
+    current_trace_context,
+    safe_emit,
+)
+
 from .contracts import (
     ClientNotification,
     ClientNotificationKind,
@@ -10,8 +22,7 @@ from .contracts import (
     MidgardRequest,
     MidgardResult,
 )
-from .observability import NullMidgardObserver, RoutingEvent, RoutingEventType
-from .ports import AsgardTarget, MidgardObserver
+from .ports import AsgardTarget
 
 
 class MidgardRouter:
@@ -21,11 +32,11 @@ class MidgardRouter:
         self,
         targets: Iterable[AsgardTarget],
         *,
-        observer: MidgardObserver | None = None,
+        tracer: Tracer | None = None,
         documentation_url: str | None = None,
     ) -> None:
         self._targets = tuple(targets)
-        self._observer = observer or NullMidgardObserver()
+        self._tracer = tracer or NullTracer()
         self._documentation_url = documentation_url
 
     @property
@@ -33,17 +44,21 @@ class MidgardRouter:
         return tuple(target.butler_name for target in self._targets)
 
     async def route(self, request: MidgardRequest) -> MidgardResult:
-        self._record(
-            RoutingEvent(
-                event_type=RoutingEventType.RECEIVED,
-                request_id=request.request_id,
-                target_butler_name=request.target_butler_name,
-            )
+        context = current_trace_context() or TraceContext.root()
+
+        self._emit(
+            context,
+            operation="midgard.route.received",
+            message="Midgard routing request received.",
+            status=TraceStatus.NORMAL,
+            level=TraceLevel.ACTIVITY,
+            request=request,
         )
 
         target_name = request.target_butler_name
         if target_name is None or not target_name.strip():
             return self._fail(
+                context,
                 request,
                 MidgardErrorCode.TARGET_REQUIRED,
                 "A target Butler name is required.",
@@ -57,6 +72,7 @@ class MidgardRouter:
 
         if not matches:
             return self._unavailable(
+                context,
                 request,
                 MidgardErrorCode.BUTLER_NOT_FOUND,
                 "The requested Butler could not be found.",
@@ -64,6 +80,7 @@ class MidgardRouter:
 
         if len(matches) > 1:
             return self._fail(
+                context,
                 request,
                 MidgardErrorCode.AMBIGUOUS_TARGET,
                 "More than one Asgard recognizes the requested Butler identity.",
@@ -72,25 +89,28 @@ class MidgardRouter:
         target = matches[0]
         if not target.available:
             return self._unavailable(
+                context,
                 request,
                 MidgardErrorCode.TARGET_UNAVAILABLE,
                 "The requested Butler is currently unavailable.",
                 source_butler_name=target.butler_name,
             )
 
-        self._record(
-            RoutingEvent(
-                event_type=RoutingEventType.SELECTED,
-                request_id=request.request_id,
-                target_butler_name=target_name,
-                source_butler_name=target.butler_name,
-            )
+        self._emit(
+            context,
+            operation="midgard.route.selected",
+            message="Midgard selected a Butler-owned Asgard.",
+            status=TraceStatus.SUCCESS,
+            level=TraceLevel.ACTIVITY,
+            request=request,
+            source_butler_name=target.butler_name,
         )
 
         try:
             result = await target.handle(request)
         except Exception:
             return self._unavailable(
+                context,
                 request,
                 MidgardErrorCode.TARGET_FAILURE,
                 "The requested Butler did not answer.",
@@ -99,6 +119,7 @@ class MidgardRouter:
 
         if result.request_id != request.request_id:
             return self._fail(
+                context,
                 request,
                 MidgardErrorCode.CORRELATION_MISMATCH,
                 "The response correlation does not match the request.",
@@ -106,37 +127,42 @@ class MidgardRouter:
             )
 
         if isinstance(result, MidgardError):
-            self._record(
-                RoutingEvent(
-                    event_type=RoutingEventType.FAILED,
-                    request_id=request.request_id,
-                    target_butler_name=target_name,
-                    source_butler_name=target.butler_name,
-                    reason=result.code.value,
-                )
+            self._emit(
+                context,
+                operation="midgard.route.failed",
+                message="The selected Butler returned a structured routing failure.",
+                status=TraceStatus.ERROR,
+                severity=TraceSeverity.DEGRADED,
+                level=TraceLevel.OPERATIONAL,
+                request=request,
+                source_butler_name=target.butler_name,
+                reason=result.code.value,
             )
             return result
 
         if result.source_butler_name != target.butler_name:
             return self._fail(
+                context,
                 request,
                 MidgardErrorCode.SOURCE_IDENTITY_MISMATCH,
                 "The response Butler identity does not match the selected Asgard.",
                 source_butler_name=target.butler_name,
             )
 
-        self._record(
-            RoutingEvent(
-                event_type=RoutingEventType.COMPLETED,
-                request_id=request.request_id,
-                target_butler_name=target_name,
-                source_butler_name=result.source_butler_name,
-            )
+        self._emit(
+            context,
+            operation="midgard.route.completed",
+            message="Midgard routing completed.",
+            status=TraceStatus.SUCCESS,
+            level=TraceLevel.ACTIVITY,
+            request=request,
+            source_butler_name=result.source_butler_name,
         )
         return result
 
     def _unavailable(
         self,
+        context: TraceContext,
         request: MidgardRequest,
         code: MidgardErrorCode,
         message: str,
@@ -144,6 +170,7 @@ class MidgardRouter:
         source_butler_name: str | None = None,
     ) -> MidgardError:
         return self._fail(
+            context,
             request,
             code,
             message,
@@ -156,6 +183,7 @@ class MidgardRouter:
 
     def _fail(
         self,
+        context: TraceContext,
         request: MidgardRequest,
         code: MidgardErrorCode,
         message: str,
@@ -163,14 +191,16 @@ class MidgardRouter:
         source_butler_name: str | None = None,
         notification: ClientNotification | None = None,
     ) -> MidgardError:
-        self._record(
-            RoutingEvent(
-                event_type=RoutingEventType.FAILED,
-                request_id=request.request_id,
-                target_butler_name=request.target_butler_name,
-                source_butler_name=source_butler_name,
-                reason=code.value,
-            )
+        self._emit(
+            context,
+            operation="midgard.route.failed",
+            message="Midgard routing failed.",
+            status=TraceStatus.ERROR,
+            severity=TraceSeverity.DEGRADED,
+            level=TraceLevel.OPERATIONAL,
+            request=request,
+            source_butler_name=source_butler_name,
+            reason=code.value,
         )
         return MidgardError(
             code=code,
@@ -179,9 +209,39 @@ class MidgardRouter:
             notification=notification,
         )
 
-    def _record(self, event: RoutingEvent) -> None:
-        try:
-            self._observer.record(event)
-        except Exception:
-            # Observability must never become an execution dependency.
-            pass
+    def _emit(
+        self,
+        context: TraceContext,
+        *,
+        operation: str,
+        message: str,
+        status: TraceStatus,
+        request: MidgardRequest,
+        level: TraceLevel,
+        severity: TraceSeverity = TraceSeverity.NORMAL,
+        source_butler_name: str | None = None,
+        reason: str | None = None,
+    ) -> None:
+        attributes: dict[str, str] = {
+            "request_id": request.request_id,
+        }
+        if request.target_butler_name:
+            attributes["target_butler_name"] = request.target_butler_name
+        if source_butler_name:
+            attributes["source_butler_name"] = source_butler_name
+        if reason:
+            attributes["reason"] = reason
+
+        safe_emit(
+            self._tracer,
+            TraceEvent(
+                context=context,
+                component="midgard",
+                operation=operation,
+                message=message,
+                level=level,
+                status=status,
+                severity=severity,
+                attributes=attributes,
+            ),
+        )

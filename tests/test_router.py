@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from butler_core import TraceEvent
 
 from butler_midgard import (
     ClientNotificationKind,
@@ -10,8 +11,6 @@ from butler_midgard import (
     MidgardRequest,
     MidgardResponse,
     MidgardRouter,
-    RoutingEvent,
-    RoutingEventType,
 )
 
 
@@ -52,20 +51,20 @@ class FakeAsgard:
         )
 
 
-class RecordingObserver:
+class RecordingTracer:
     def __init__(self) -> None:
-        self.events: list[RoutingEvent] = []
+        self.events: list[TraceEvent] = []
 
-    def record(self, event: RoutingEvent) -> None:
+    def emit(self, event: TraceEvent) -> None:
         self.events.append(event)
 
 
 @pytest.mark.asyncio
-async def test_midgard_asks_asgards_and_routes_to_the_one_that_answers_yes() -> None:
+async def test_midgard_asks_asgards_and_emits_core_georges_trace() -> None:
     butler_a = FakeAsgard("Butler-A")
     butler_b = FakeAsgard("Butler-B")
-    observer = RecordingObserver()
-    router = MidgardRouter([butler_a, butler_b], observer=observer)
+    tracer = RecordingTracer()
+    router = MidgardRouter([butler_a, butler_b], tracer=tracer)
 
     result = await router.route(
         MidgardRequest(
@@ -84,28 +83,31 @@ async def test_midgard_asks_asgards_and_routes_to_the_one_that_answers_yes() -> 
         response="Butler-B: hello",
         source_butler_name="Butler-B",
     )
-    assert [event.event_type for event in observer.events] == [
-        RoutingEventType.RECEIVED,
-        RoutingEventType.SELECTED,
-        RoutingEventType.COMPLETED,
+    assert [event.operation for event in tracer.events] == [
+        "midgard.route.received",
+        "midgard.route.selected",
+        "midgard.route.completed",
     ]
+    assert len({event.context.trace_id for event in tracer.events}) == 1
+    assert tracer.events[-1].attributes["source_butler_name"] == "Butler-B"
+    assert all("hello" not in str(event.attributes) for event in tracer.events)
 
 
 @pytest.mark.asyncio
 async def test_all_asgards_say_not_me_returns_butler_not_found_notification() -> None:
     first = FakeAsgard("Butler-A")
     second = FakeAsgard("Butler-B")
-    observer = RecordingObserver()
+    tracer = RecordingTracer()
     router = MidgardRouter(
         [first, second],
-        observer=observer,
+        tracer=tracer,
         documentation_url="https://docs.example.test/doctor",
     )
 
     result = await router.route(
         MidgardRequest(
             request_id="req-2",
-            message="hello",
+            message="private message",
             target_butler_name="Missing",
         )
     )
@@ -121,7 +123,9 @@ async def test_all_asgards_say_not_me_returns_butler_not_found_notification() ->
         is ClientNotificationPresentation.SYSTEM_NEUTRAL
     )
     assert result.notification.documentation_url == "https://docs.example.test/doctor"
-    assert observer.events[-1].reason == "butler_not_found"
+    assert tracer.events[-1].operation == "midgard.route.failed"
+    assert tracer.events[-1].attributes["reason"] == "butler_not_found"
+    assert all("private message" not in str(event.attributes) for event in tracer.events)
 
 
 @pytest.mark.asyncio
@@ -241,14 +245,14 @@ async def test_asgard_failure_returns_neutral_butler_unavailable_notification() 
 
 
 @pytest.mark.asyncio
-async def test_observer_failure_does_not_break_routing() -> None:
-    class BrokenObserver:
-        def record(self, event: RoutingEvent) -> None:
-            raise RuntimeError("observer down")
+async def test_tracer_failure_does_not_break_routing() -> None:
+    class BrokenTracer:
+        def emit(self, event: TraceEvent) -> None:
+            raise RuntimeError("tracer down")
 
     router = MidgardRouter(
         [FakeAsgard("Butler-A")],
-        observer=BrokenObserver(),
+        tracer=BrokenTracer(),
     )
 
     result = await router.route(
