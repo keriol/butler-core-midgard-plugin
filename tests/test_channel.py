@@ -14,14 +14,6 @@ from butler_midgard import (
 )
 
 
-class EchoCoreHandler:
-    async def handle(self, request: MidgardRequest) -> MidgardResponse:
-        return MidgardResponse(
-            request_id=request.request_id,
-            response=f"Echo: {request.message}",
-        )
-
-
 @pytest.mark.asyncio
 async def test_channel_preserves_correlation_and_target_metadata() -> None:
     seen: list[MidgardRequest] = []
@@ -37,7 +29,7 @@ async def test_channel_preserves_correlation_and_target_metadata() -> None:
     request = MidgardRequest(
         request_id="req-1",
         message="hello",
-        target_butler_name="Alfred",
+        target_butler_name="butler-a",
         speaker=SpeakerContext(
             speaker_id="user-1",
             persistent=True,
@@ -50,7 +42,7 @@ async def test_channel_preserves_correlation_and_target_metadata() -> None:
 
     assert result == MidgardResponse(request_id="req-1", response="ok")
     assert seen == [request]
-    assert seen[0].target_butler_name == "Alfred"
+    assert seen[0].target_butler_name == "butler-a"
 
 
 @pytest.mark.asyncio
