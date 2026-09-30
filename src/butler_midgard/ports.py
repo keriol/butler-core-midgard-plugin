@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Protocol
 
 from .contracts import MidgardRequest, MidgardResult
-from .observability import RoutingEvent
 
 
 class CoreRequestHandler(Protocol):
@@ -31,14 +30,4 @@ class AsgardTarget(Protocol):
 
     async def handle(self, request: MidgardRequest) -> MidgardResult:
         """Forward the request into this Asgard's Butler."""
-        ...
-
-
-class MidgardObserver(Protocol):
-    """Neutral observability sink.
-
-    A concrete Butler host may adapt this port to its own observability system.
-    """
-
-    def record(self, event: RoutingEvent) -> None:
         ...

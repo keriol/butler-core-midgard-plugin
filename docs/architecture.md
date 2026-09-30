@@ -50,12 +50,14 @@ Midgard owns:
 - request correlation preservation;
 - safe routing/session metadata transport;
 - structured routing failures;
-- neutral routing observability events.
+- semantic timing/meaning of its routing trace events.
 
 Midgard does not own:
 
 - a Butler's name;
 - Butler-side Asgard implementation;
+- Georges tracing contracts;
+- trace storage/persistence;
 - client UI, STT or TTS;
 - Bifröst transport/session implementation;
 - concrete runtime lifecycle;
@@ -81,27 +83,27 @@ Bifröst transports this descriptor and Interphone owns localized rendering.
 
 This is synchronous request/response UX, not proactive Butler communication. No fallback Butler is selected and no unrelated Asgard is involved.
 
-The intended user-facing meaning is equivalent to:
-
-> This Butler is currently unavailable. It may be offline or incorrectly configured. If you need the Doctor: <documentation link>
-
-The localized sentence does not belong in the reusable Midgard package.
-
 ## Georges observability
 
-Midgard does not import Alfred or Georges.
-
-Instead, Midgard exposes a neutral observer port and emits structured routing events:
+Midgard emits routing observability through Butler Core's provider-neutral Georges tracing contract:
 
 ```text
-midgard.route.received
-midgard.route.selected
-midgard.route.completed
-midgard.route.failed
+Midgard
+  |
+  +-> TraceEvent("midgard.route.received")
+  +-> TraceEvent("midgard.route.selected")
+  +-> TraceEvent("midgard.route.completed")
+  +-> TraceEvent("midgard.route.failed")
+        |
+        v
+   injected Core Tracer
+        |
+        v
+ concrete Butler sink
 ```
 
-A concrete Butler host may adapt this port to its observability system. In the current private Alfred proving runtime, the adapter will project these facts into Georges.
+Midgard depends on the Core tracing API rather than maintaining a second observer/event abstraction.
 
-Georges records routing success/failure independently from any client error notification.
+Only safe routing metadata is traced. Request message bodies, credentials, endpoints and provider payloads are excluded.
 
-Observer failure must not change the routing result.
+Tracer failure must not change routing behavior.

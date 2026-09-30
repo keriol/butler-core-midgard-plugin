@@ -55,11 +55,14 @@ jobs:
           set -Eeuo pipefail
           CLEAN="$(mktemp -d)"
           python -m venv "$CLEAN/venv"
-          "$CLEAN/venv/bin/python" -m pip install --quiet --no-deps dist/*.whl
+          "$CLEAN/venv/bin/python" -m pip install --quiet dist/*.whl
           cd "$CLEAN"
           "$CLEAN/venv/bin/python" - <<'PY'
           from butler_midgard import MidgardRequest
+          from butler_core import TraceEvent
+
           req = MidgardRequest(request_id="smoke", message="hello")
           assert req.request_id == "smoke"
-          print("Clean-room Midgard contract: OK")
+          assert TraceEvent is not None
+          print("Clean-room Midgard + Core Georges contract: OK")
           PY
