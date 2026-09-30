@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .contracts import (
+    ClientNotification,
+    ClientNotificationKind,
     MidgardError,
     MidgardErrorCode,
     MidgardRequest,
-    MidgardResponse,
     MidgardResult,
 )
 from .observability import NullMidgardObserver, RoutingEvent, RoutingEventType
@@ -14,16 +15,18 @@ from .ports import AsgardTarget, MidgardObserver
 
 
 class MidgardRouter:
-    """Route requests between Butler universes by Asgard-declared identity."""
+    """Route requests between Butler universes through Butler-owned Asgards."""
 
     def __init__(
         self,
         targets: Iterable[AsgardTarget],
         *,
         observer: MidgardObserver | None = None,
+        documentation_url: str | None = None,
     ) -> None:
         self._targets = tuple(targets)
         self._observer = observer or NullMidgardObserver()
+        self._documentation_url = documentation_url
 
     @property
     def visible_butler_names(self) -> tuple[str, ...]:
@@ -47,29 +50,32 @@ class MidgardRouter:
             )
 
         matches = tuple(
-            target for target in self._targets if target.butler_name == target_name
+            target
+            for target in self._targets
+            if target.matches_butler_name(target_name)
         )
 
         if not matches:
-            return self._fail(
+            return self._unavailable(
                 request,
-                MidgardErrorCode.UNKNOWN_TARGET,
-                "The requested Butler is not visible to Midgard.",
+                MidgardErrorCode.BUTLER_NOT_FOUND,
+                "The requested Butler could not be found.",
             )
 
         if len(matches) > 1:
             return self._fail(
                 request,
                 MidgardErrorCode.AMBIGUOUS_TARGET,
-                "More than one Asgard declares the requested Butler identity.",
+                "More than one Asgard recognizes the requested Butler identity.",
             )
 
         target = matches[0]
         if not target.available:
-            return self._fail(
+            return self._unavailable(
                 request,
                 MidgardErrorCode.TARGET_UNAVAILABLE,
                 "The requested Butler is currently unavailable.",
+                source_butler_name=target.butler_name,
             )
 
         self._record(
@@ -84,10 +90,10 @@ class MidgardRouter:
         try:
             result = await target.handle(request)
         except Exception:
-            return self._fail(
+            return self._unavailable(
                 request,
                 MidgardErrorCode.TARGET_FAILURE,
-                "The selected Butler ingress failed.",
+                "The requested Butler did not answer.",
                 source_butler_name=target.butler_name,
             )
 
@@ -129,6 +135,25 @@ class MidgardRouter:
         )
         return result
 
+    def _unavailable(
+        self,
+        request: MidgardRequest,
+        code: MidgardErrorCode,
+        message: str,
+        *,
+        source_butler_name: str | None = None,
+    ) -> MidgardError:
+        return self._fail(
+            request,
+            code,
+            message,
+            source_butler_name=source_butler_name,
+            notification=ClientNotification(
+                kind=ClientNotificationKind.BUTLER_UNAVAILABLE,
+                documentation_url=self._documentation_url,
+            ),
+        )
+
     def _fail(
         self,
         request: MidgardRequest,
@@ -136,6 +161,7 @@ class MidgardRouter:
         message: str,
         *,
         source_butler_name: str | None = None,
+        notification: ClientNotification | None = None,
     ) -> MidgardError:
         self._record(
             RoutingEvent(
@@ -150,6 +176,7 @@ class MidgardRouter:
             code=code,
             message=message,
             request_id=request.request_id or None,
+            notification=notification,
         )
 
     def _record(self, event: RoutingEvent) -> None:

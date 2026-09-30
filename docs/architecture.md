@@ -4,16 +4,18 @@ Midgard is the reusable cross-Butler communication channel between Bifröst and 
 
 ## Canonical routing model
 
-Every concrete Butler owns its own Asgard entity. Asgard is the authoritative source of that Butler's name.
+Every concrete Butler owns its own Asgard entity. Asgard is authoritative for the name/identity of that Butler.
 
-Midgard observes the Asgard targets available to it and chooses the requested Butler universe.
+Midgard asks the visible Asgard targets whether they belong to the requested Butler and routes to the unique positive answer.
 
 ```text
-                       Asgard("Butler-A") -> Butler A
-                      /
-Bifröst -> Midgard --+-- Asgard("Butler-B") -> Butler B
-                      \
-                       Asgard("Butler-C") -> Butler C
+Midgard: "Who is Butler-B?"
+
+Asgard("Butler-A") -> not me
+Asgard("Butler-B") -> me
+Asgard("Butler-C") -> not me
+
+Midgard -> Asgard("Butler-B") -> Butler B
 ```
 
 Butler Core remains provider-neutral. It owns neither Butler identity nor cross-Butler target selection.
@@ -61,19 +63,29 @@ Midgard does not own:
 - provider-specific behavior;
 - authentication, permission or confirmation policy.
 
-## Routing failures
+## Butler unavailable
 
-There is no implicit default Butler.
+If every visible Asgard answers "not me", Midgard returns `butler_not_found`.
 
-Stable failures include:
+If the matching Asgard is offline/unavailable, or the selected Butler fails to answer, Midgard returns the appropriate structured error.
 
-- missing target;
-- unknown target;
-- unavailable target;
-- duplicate/ambiguous identity;
-- downstream ingress failure;
-- correlation mismatch;
-- source-identity mismatch.
+These cases may carry the same semantic client-notification descriptor:
+
+```text
+kind = butler_unavailable
+presentation = system_neutral
+documentation_url = optional
+```
+
+Bifröst transports this descriptor and Interphone owns localized rendering.
+
+This is synchronous request/response UX, not proactive Butler communication. No fallback Butler is selected and no unrelated Asgard is involved.
+
+The intended user-facing meaning is equivalent to:
+
+> This Butler is currently unavailable. It may be offline or incorrectly configured. If you need the Doctor: <documentation link>
+
+The localized sentence does not belong in the reusable Midgard package.
 
 ## Georges observability
 
@@ -90,12 +102,6 @@ midgard.route.failed
 
 A concrete Butler host may adapt this port to its observability system. In the current private Alfred proving runtime, the adapter will project these facts into Georges.
 
-This preserves the rule:
-
-```text
-Midgard -> neutral routing event -> Alfred adapter -> Georges
-```
-
-Georges records the fact. Osvaldo remains responsible for deciding whether an eligible event becomes user-facing communication, and Hermes/Bifröst remain delivery mechanisms after policy approval.
+Georges records routing success/failure independently from any client error notification.
 
 Observer failure must not change the routing result.

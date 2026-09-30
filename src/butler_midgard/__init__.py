@@ -1,5 +1,8 @@
 from .channel import MidgardChannel
 from .contracts import (
+    ClientNotification,
+    ClientNotificationKind,
+    ClientNotificationPresentation,
     MidgardError,
     MidgardErrorCode,
     MidgardRequest,
@@ -16,6 +19,9 @@ from .router import MidgardRouter
 
 __all__ = [
     "AsgardTarget",
+    "ClientNotification",
+    "ClientNotificationKind",
+    "ClientNotificationPresentation",
     "CoreRequestHandler",
     "MidgardChannel",
     "MidgardError",

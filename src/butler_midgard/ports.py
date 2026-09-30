@@ -16,13 +16,17 @@ class AsgardTarget(Protocol):
     """Butler-owned ingress visible to Midgard through a neutral port."""
 
     @property
-    def butler_name(self) -> str:
-        """Return the authoritative Butler identity owned by this Asgard."""
+    def available(self) -> bool:
+        """Return whether the Butler-owned ingress is currently addressable."""
+        ...
+
+    def matches_butler_name(self, requested_name: str) -> bool:
+        """Answer whether this Asgard belongs to the requested Butler."""
         ...
 
     @property
-    def available(self) -> bool:
-        """Return whether the Butler-owned ingress is currently addressable."""
+    def butler_name(self) -> str:
+        """Return this Asgard's authoritative Butler identity."""
         ...
 
     async def handle(self, request: MidgardRequest) -> MidgardResult:
@@ -33,8 +37,7 @@ class AsgardTarget(Protocol):
 class MidgardObserver(Protocol):
     """Neutral observability sink.
 
-    Alfred may adapt this port to Georges without making Midgard depend on
-    Alfred or on any concrete observability implementation.
+    A concrete Butler host may adapt this port to its own observability system.
     """
 
     def record(self, event: RoutingEvent) -> None:
