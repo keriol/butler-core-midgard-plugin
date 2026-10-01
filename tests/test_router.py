@@ -4,6 +4,7 @@ import pytest
 from butler_core import TraceEvent
 
 from butler_midgard import (
+    ButlerDirectoryEntry,
     ClientNotificationKind,
     ClientNotificationPresentation,
     MidgardError,
@@ -37,6 +38,10 @@ class FakeAsgard:
     @property
     def available(self) -> bool:
         return self._available
+
+    @property
+    def nicknames(self) -> tuple[str, ...]:
+        return self._aliases
 
     def matches_butler_name(self, requested_name: str) -> bool:
         self.name_queries.append(requested_name)
@@ -265,3 +270,36 @@ async def test_tracer_failure_does_not_break_routing() -> None:
 
     assert isinstance(result, MidgardResponse)
     assert result.source_butler_name == "Butler-A"
+
+
+def test_visible_butlers_projects_asgard_owned_identity_aliases_and_availability() -> None:
+    router = MidgardRouter(
+        [
+            FakeAsgard(
+                "Butler-A",
+                aliases=("A", "Alpha"),
+            ),
+            FakeAsgard(
+                "Butler-B",
+                available=False,
+                aliases=("B",),
+            ),
+        ]
+    )
+
+    assert router.visible_butlers == (
+        ButlerDirectoryEntry(
+            canonical_name="Butler-A",
+            aliases=("A", "Alpha"),
+            available=True,
+        ),
+        ButlerDirectoryEntry(
+            canonical_name="Butler-B",
+            aliases=("B",),
+            available=False,
+        ),
+    )
+    assert router.visible_butler_names == (
+        "Butler-A",
+        "Butler-B",
+    )
