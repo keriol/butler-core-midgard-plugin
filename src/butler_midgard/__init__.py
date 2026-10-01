@@ -10,11 +10,32 @@ from .contracts import (
     MidgardResponse,
     SpeakerContext,
 )
-from .ports import AsgardTarget, CoreRequestHandler
+from .ports import AsgardTarget, ButlerDescriptorSource, CoreRequestHandler
+from .manifest import (
+    ButlerDescriptor,
+    CallableDescriptor,
+    CoreStackDescriptor,
+    DependencyDescriptor,
+    EntityDescriptor,
+    MidgardNodeManifest,
+    PluginDescriptor,
+    ReadinessDescriptor,
+)
+from .manifest_projection import MidgardManifestProjector
 from .router import MidgardRouter
 
 __all__ = [
     "AsgardTarget",
+    "ButlerDescriptorSource",
+    "ButlerDescriptor",
+    "CallableDescriptor",
+    "CoreStackDescriptor",
+    "DependencyDescriptor",
+    "EntityDescriptor",
+    "MidgardManifestProjector",
+    "MidgardNodeManifest",
+    "PluginDescriptor",
+    "ReadinessDescriptor",
     "ClientNotification",
     "ClientNotificationKind",
     "ClientNotificationPresentation",
