@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from .contracts import MidgardRequest, MidgardResult
+from .manifest import ButlerDescriptor
 
 
 class CoreRequestHandler(Protocol):
@@ -35,4 +36,14 @@ class AsgardTarget(Protocol):
 
     async def handle(self, request: MidgardRequest) -> MidgardResult:
         """Forward the request into this Asgard's Butler."""
+        ...
+
+
+
+class ButlerDescriptorSource(Protocol):
+    """Asgard-side projection of one concrete Butler runtime descriptor."""
+
+    @property
+    def butler_descriptor(self) -> ButlerDescriptor:
+        """Return the descriptor supplied by the concrete Butler through Asgard."""
         ...
