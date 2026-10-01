@@ -17,6 +17,7 @@ from butler_core import (
 from .contracts import (
     ClientNotification,
     ClientNotificationKind,
+    ButlerDirectoryEntry,
     MidgardError,
     MidgardErrorCode,
     MidgardRequest,
@@ -40,8 +41,20 @@ class MidgardRouter:
         self._documentation_url = documentation_url
 
     @property
+    def visible_butlers(self) -> tuple[ButlerDirectoryEntry, ...]:
+        return tuple(
+            ButlerDirectoryEntry(
+                canonical_name=target.butler_name,
+                aliases=tuple(target.nicknames),
+                available=target.available,
+            )
+            for target in self._targets
+        )
+
+    @property
     def visible_butler_names(self) -> tuple[str, ...]:
-        return tuple(target.butler_name for target in self._targets)
+        """Backward-compatible projection of visible canonical identities."""
+        return tuple(entry.canonical_name for entry in self.visible_butlers)
 
     async def route(self, request: MidgardRequest) -> MidgardResult:
         context = current_trace_context() or TraceContext.root()
