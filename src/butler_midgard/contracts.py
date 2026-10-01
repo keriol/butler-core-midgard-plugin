@@ -42,6 +42,13 @@ class SpeakerContext:
 
 
 @dataclass(frozen=True, slots=True)
+class ButlerDirectoryEntry:
+    canonical_name: str
+    aliases: tuple[str, ...] = ()
+    available: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class MidgardRequest:
     request_id: str
     message: str

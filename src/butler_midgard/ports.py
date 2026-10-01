@@ -28,6 +28,11 @@ class AsgardTarget(Protocol):
         """Return this Asgard's authoritative Butler identity."""
         ...
 
+    @property
+    def nicknames(self) -> tuple[str, ...]:
+        """Return additional Butler-owned addressing aliases."""
+        ...
+
     async def handle(self, request: MidgardRequest) -> MidgardResult:
         """Forward the request into this Asgard's Butler."""
         ...
