@@ -21,9 +21,9 @@ external client
 
 Responses return through the same communication path in reverse.
 
-**Asgard is not a Butler Core plugin.** It is a Butler-side plugin/entity. In the current private proving runtime, Asgard is an Alfred entity.
+**Asgard is not a Butler Core plugin.** It is a Butler-side ingress abstraction supplied by a concrete Butler runtime and remains outside this package.
 
-The project is currently in private incubation and is being developed public-ready from the first commit.
+Midgard 0.0.1 is the first Public Alpha checkpoint of the provider-neutral communication layer.
 
 ## Scope
 
@@ -33,7 +33,9 @@ Midgard does not own concrete Butler runtime behavior, Butler-side entities such
 
 ## Status
 
-Early bootstrap. Active work is tracked in GitHub Issues.
+Current Public Alpha: **0.0.1**.
+
+The 0.0.1 line provides the live-proven Core-facing channel, explicit Butler-target routing boundary, Butler directory projection and client-manifest aggregation. A reusable standalone Asgard implementation is deliberately not part of this release. Active work is tracked in GitHub Issues.
 
 ## License
 
