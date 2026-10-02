@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "butler-core-midgard-plugin"
-version = "0.0.1.dev0"
+version = "0.1.0"
 description = "Cross-Butler communication channel for the Butler ecosystem"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 dependencies = [
-    "butler-core @ https://github.com/keriol/butler-core/archive/e0e41b26f8f421c8a2043e6061121b520958d90c.tar.gz",
+    "butler-core @ https://github.com/keriol/butler-core/archive/980df57b6615c39ccb6edc0b8e7bca9b69e550b7.tar.gz",
 ]
 
 [project.optional-dependencies]
