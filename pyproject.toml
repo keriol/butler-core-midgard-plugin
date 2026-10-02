@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 dependencies = [
-    "butler-core @ https://github.com/keriol/butler-core/archive/8d19ac82e4f6ea5c952468a705252978a2f953b0.tar.gz",
+    "butler-core @ https://github.com/keriol/butler-core/archive/980df57b6615c39ccb6edc0b8e7bca9b69e550b7.tar.gz",
 ]
 
 [project.optional-dependencies]
