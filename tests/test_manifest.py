@@ -88,6 +88,23 @@ def test_manifest_keeps_core_plugins_shared_and_butler_metadata_local() -> None:
     assert manifest.butlers[0].plugins[0].name == "butler-local-plugin"
 
 
+def test_manifest_preserves_optional_butler_profile_picture_metadata() -> None:
+    descriptor = ButlerDescriptor(
+        canonical_name="Butler-A",
+        profile_picture_data_uri="data:image/png;base64,ZmFrZQ==",
+    )
+
+    manifest = MidgardManifestProjector(
+        core=CoreStackDescriptor(version="1.0.0"),
+        butlers=(FakeDescriptorSource(descriptor),),
+    ).snapshot()
+
+    assert (
+        manifest.butlers[0].profile_picture_data_uri
+        == "data:image/png;base64,ZmFrZQ=="
+    )
+
+
 def test_manifest_preserves_multiple_asgard_projected_butlers() -> None:
     manifest = MidgardManifestProjector(
         core=CoreStackDescriptor(version="1.0.0"),
